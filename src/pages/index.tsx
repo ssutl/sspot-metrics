@@ -1,118 +1,184 @@
-import Image from "next/image";
-import { Inter } from "next/font/google";
+import React, { useEffect, useState } from "react";
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue } from "firebase/database";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { format, differenceInMinutes } from "date-fns";
 
-const inter = Inter({ subsets: ["latin"] });
+interface PlantData {
+  Conductivity: number;
+  Moisture: number;
+  Temperature: number;
+}
+
+interface ChartData {
+  time: string;
+  Conductivity: number;
+  Moisture: number;
+  Temperature: number;
+}
 
 export default function Home() {
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [potIsLive, setPotIsLive] = useState<boolean>(false);
+
+  const firebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  useEffect(() => {
+    const plantRef = ref(db, "SSPOTV1");
+
+    signInAnonymously(auth)
+      .then(() => {
+        console.log("Signed in anonymously");
+      })
+      .catch((error) => {
+        console.error("Error signing in anonymously:", error);
+      });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("User signed in:", user);
+        onValue(plantRef, (snapshot) => {
+          const data = snapshot.val();
+          const formattedData = Object.keys(data).map((timestamp) => ({
+            time: timestamp,
+            Conductivity: data[timestamp].Conductivity,
+            Moisture: data[timestamp].Moisture, // Ensure this key matches the data in your database
+            Temperature: data[timestamp].Temperature,
+          }));
+          setChartData(formattedData);
+
+          // Check if the pot is live
+          const latestTimestamp = formattedData[formattedData.length - 1]?.time;
+          if (latestTimestamp) {
+            const now = new Date();
+            const lastUpdate = new Date(latestTimestamp);
+            const isLive = differenceInMinutes(now, lastUpdate) <= 20;
+            setPotIsLive(isLive);
+          }
+        });
+      } else {
+        console.log("User signed out");
+      }
+    });
+  }, [auth, db]);
+
+  const formatXAxis = (tickItem: string) => {
+    return format(new Date(tickItem), "dd/MM HH:mm");
+  };
+
+  const colour1 = "#ffc100";
+  const colour2 = "#FF8D21";
+  const colour3 = "#C0CFFA";
+
   return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
+    <main className="w-full h-screen flex flex-col items-center justify-between py-16 px-10">
+      <h1>
+        <span
+          style={{
+            color: potIsLive ? "#b8cf69" : "#ff5252",
+            fontSize: "1.5rem",
+          }}
         >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
+          ●
+        </span>{" "}
+        SSPOTV1
+      </h1>
+      <ResponsiveContainer width="100%" height={700}>
+        <AreaChart
+          data={chartData}
+          margin={{
+            top: 10,
+            right: 30,
+            left: 0,
+            bottom: 0,
+          }}
         >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+          <defs>
+            <linearGradient id="colorConductivity" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={colour1} stopOpacity={0.8} />
+              <stop offset="95%" stopColor={colour1} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorTemperature" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={colour2} stopOpacity={0.95} />
+              <stop offset="95%" stopColor={colour2} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorMoisture" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={colour3} stopOpacity={0.8} />
+              <stop offset="95%" stopColor={colour3} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="time"
+            tickFormatter={formatXAxis}
+            label={{
+              value: "Time (dd/MM HH:mm)",
+              position: "insideBottomRight",
+              offset: -5,
+            }}
+          />
+          <YAxis
+            yAxisId="left"
+            label={{
+              value: "Conductivity (us/cm)",
+              angle: -90,
+              position: "insideLeft",
+            }}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            label={{
+              value: "Moisture (%) & Temperature (°C)",
+              angle: 90,
+              position: "insideRight",
+            }}
+          />
+          <Tooltip />
+          <Legend />
+          <Area
+            type="monotone"
+            dataKey="Conductivity"
+            stroke={colour1}
+            fill="url(#colorConductivity)"
+            fillOpacity={0.5}
+            yAxisId="left"
+          />
+          <Area
+            type="monotone"
+            dataKey="Temperature"
+            stroke={colour2}
+            fill="url(#colorTemperature)"
+            fillOpacity={0.5}
+            yAxisId="right"
+          />
+          <Area
+            type="monotone"
+            dataKey="Moisture"
+            stroke={colour3}
+            fill="url(#colorMoisture)"
+            fillOpacity={0.5}
+            yAxisId="right"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </main>
   );
 }
