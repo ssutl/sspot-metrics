@@ -106,7 +106,7 @@ export default function Home() {
   const colour3 = "#C0CFFA";
 
   return (
-    <main className="w-full h-screen flex flex-col items-center justify-between py-16 px-10">
+    <main className="w-full h-dvh overflow-hidden flex flex-col items-center justify-between py-16 px-10">
       <h1>
         <span
           style={{
